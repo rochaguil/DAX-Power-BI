@@ -1,0 +1,35 @@
+# Cash Flow File
+
+# Use Inactive Date Relationship
+BAIXA_CAP = CALCULATE(SUM(CAP[VALOR_BAIXADO_BRL]), USERELATIONSHIP(CalendarDAX[Date], CAP[E2_BAIXA]))
+
+# Cumulative Sum with Slicer filter
+DESP_PREV_ACUM = 
+var _MIN =  MINX(ALLSELECTED(CalendarDAX[Date]), [Date])
+RETURN
+    CALCULATE([DESP_PREV], FILTER(ALL(CalendarDAX[Date]), CalendarDAX[Date] >= _MIN && CalendarDAX[Date] <= SELECTEDVALUE(CalendarDAX[Date])))
+
+#Cumulative Sum with Slicer Filter
+SALDO_CAP_ACUM = 
+var _MIN =  MINX(ALLSELECTED(CalendarDAX[Date]), [Date])
+RETURN
+    CALCULATE([SALDO_CAP], FILTER(ALL(CalendarDAX[Date]), CalendarDAX[Date] >= _MIN && CalendarDAX[Date] <= SELECTEDVALUE(CalendarDAX[Date])))
+
+# Last Balance Value
+SALDO_BANC_ULT = 
+VAR DT_MAX = CALCULATE(
+        SELECTEDVALUE('xl Saldos'[Total Ciclo]),
+        FILTER(
+            ALLSELECTED(CalendarDAX[Date]),
+            CalendarDAX[Date] = TODAY()))
+RETURN
+    IF(SELECTEDVALUE(CalendarDAX[Date]) < TODAY(), BLANK(), DT_MAX)
+
+# Total Balance
+SALDO = 
+VAR saldo_prev = [SALDO_CAR_ACUM] - [SALDO_CAP_ACUM]
+VAR saldo_baix = [MOV_BAIXA_R] - [MOV_BAIXA_P]
+RETURN
+    IF(SELECTEDVALUE(CalendarDAX[Date]) < TODAY(),
+        saldo_baix + [SALDO_BANC_DIA],
+        saldo_prev + [SALDO_BANC_ULT])
