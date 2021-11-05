@@ -1,4 +1,4 @@
-# Table with cumulative percentage in days
+# Table with cumulative percentage in days considering due date
 
 TEMPO_PRAZO = 
 VAR _TOTAL = SUM( CAR[VALOR])
@@ -8,3 +8,15 @@ RETURN
         DIVIDE(
             CALCULATE(SUMX(ALLSELECTED(CAR), CAR[VALOR]), CAR[PRAZO] <= EARLIER(CAR[TEMPO])),
             _TOTAL))
+# Table with cumulative percentage in days considering actual payment
+
+TEMPO_BAIXA = 
+    VAR _TOTAL = CALCULATE(SUMX(ALLSELECTED(CAR),CAR[VALOR]), NOT ISBLANK(CAR[BAIXA]))
+    VAR AGRUP_TEMPO = SUMMARIZE(CAR, CAR[TEMPO], "PERC",
+        DIVIDE(
+        CALCULATE(SUMX(ALLSELECTED(CAR), CAR[VALOR]), not ISBLANK(CAR[BAIXA]) && CAR[TEMPO] <= EARLIER(CAR[TEMPO] )),
+        _TOTAL
+        ))
+
+RETURN
+    AGRUP_TEMPO
