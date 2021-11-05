@@ -1,0 +1,17 @@
+# Average Amount by Supplier
+Média Forn = 
+VAR meses = DATEDIFF(
+        CALCULATE(MIN(Consulta1[E2_BAIXA]), (ALLSELECTED(Consulta1))),
+        CALCULATE(MAX(Consulta1[E2_BAIXA]), (ALLSELECTED(Consulta1))),
+        MONTH) + 1
+
+RETURN
+    DIVIDE(
+SUMX(
+        SUMMARIZE('Consulta1', Consulta1[BAIXA_YEAR_MONTH],"VALOR", SUM(Consulta1[VALOR_BAIXADO_BRL])),([VALOR])),
+        meses)
+
+# Payday by account
+
+Dia Pgto Médio = 
+    AVERAGEX(ADDCOLUMNS(Consulta1, "DIAS", DAY(Consulta1[E2_BAIXA])), [DIAS])
