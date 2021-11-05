@@ -1,0 +1,10 @@
+# Table with cumulative percentage in days
+
+TEMPO_PRAZO = 
+VAR _TOTAL = SUM( CAR[VALOR])
+
+RETURN
+    SUMMARIZE(CAR, CAR[TEMPO], "PERC", 
+        DIVIDE(
+            CALCULATE(SUMX(ALLSELECTED(CAR), CAR[VALOR]), CAR[PRAZO] <= EARLIER(CAR[TEMPO])),
+            _TOTAL))
