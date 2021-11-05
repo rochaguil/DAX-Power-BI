@@ -1,0 +1,206 @@
+Budget Following Year vs Actual Current Year = 
+VAR _MAX = MAX(QTDBRUT_MES[MES])
+var _DATA = SELECTEDVALUE(CalendarDAX[Date].[Ano])
+VAR actual_ant = CALCULATE( [ACTUAL_VALOR], CalendarDAX[Date] >= DATE(SELECTEDVALUE(CalendarDAX[Date].[Ano]) - 1, 1, 1)
+    && CalendarDAX[Date] <= DATE(SELECTEDVALUE(CalendarDAX[Date].[Ano]) - 1, 12, 31))
+VAR _MAX_budget = max(CalendarDAX[Date])
+VAR _MAX_prox = CALCULATE([BUDGET_VALOR], CalendarDAX[Date] <= DATE(_DATA, MONTH(_MAX), DAY(_MAX)) && CalendarDAX[Date] >=  DATE(SELECTEDVALUE(CalendarDAX[Date].[Ano]), 1, 1))
+
+RETURN
+    if([BUDGET_VALOR] = 0, BLANK(), DIVIDE(_MAX_prox, actual_ant) - 1)
+    //if(actual_ant = 0, 0,  DIVIDE( _MAX_prox , actual_ant) -1)
+
+
+BUDGET_VALOR_YTD = 
+VAR _MAX =MAX(QTDBRUT_MES[MES])
+
+RETURN
+    CALCULATE([BUDGET_VALOR], FILTER(CalendarDAX, CalendarDAX[Date] <= _MAX))
+    
+# Average Inventory Cost
+
+#1st: Table
+Budget CMV = 
+ADDCOLUMNS(Budget,
+    
+    "ESTOQUE FINAL",
+    max(CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Estoque],1),
+    FILTER(ALL('Estoque Inicial'),'Estoque Inicial'[Data].[Ano] = EARLIER(Budget[Data].[Ano]) && 'Estoque Inicial'[Grupo] = EARLIER(Budget[Grupo])))
+    +
+    CALCULATE(SUM(Budget[BUDGET_CHEGADA_QUANT]) - SUM(Budget[BUDGET_QUANT]),
+    FILTER(ALL(Budget), Budget[Data] <= EARLIER(Budget[Data]) && Budget[Grupo] = EARLIER(Budget[Grupo]) && Budget[Data].[Ano] =EARLIER(Budget[Data].[Ano]))),0),
+    
+    "ESTOQUE INICIAL",
+    CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Estoque],1),
+    FILTER(ALL('Estoque Inicial'),'Estoque Inicial'[Data] = EARLIER(Budget[Data]) && 'Estoque Inicial'[Grupo] = EARLIER(Budget[Grupo]))),
+
+    "ESTOQUE INICIAL VALOR",
+    CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Valor],1),
+    FILTER(ALL('Estoque Inicial'),'Estoque Inicial'[Data] = EARLIER(Budget[Data]) && 'Estoque Inicial'[Grupo] = EARLIER(Budget[Grupo]))),
+    
+    "ESTOQUE FINAL VALOR",
+    CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Valor],1),
+    FILTER(ALL('Estoque Inicial'),'Estoque Inicial'[Data] = EARLIER(Budget[Data]) && 'Estoque Inicial'[Grupo] = EARLIER(Budget[Grupo]))),
+    "ESTOQUE + CHEGADAS",
+    CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Valor],1),
+    FILTER(ALL('Estoque Inicial'),'Estoque Inicial'[Data] = EARLIER(Budget[Data]) && 'Estoque Inicial'[Grupo] = EARLIER(Budget[Grupo])))
+    +
+        (CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER(Budget[Data]) && Moeda[Moeda] = EARLIER(Budget[MOEDA])) *
+            ( Budget[BUDGET_COMPRAS_VALOR]/ Budget[BUDGET_COMPRAS_QUANT]) * Budget[BUDGET_CHEGADA_QUANT]) * (1 + LOOKUPVALUE(Fatores[Fator Custo], Fatores[Grupos.Genericos],           Budget[Grupo])),
+    "TX MOEDA", IF( Budget[MOEDA] = "BRL", 1, CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER(Budget[Data]) && Moeda[Moeda] = EARLIER(Budget[MOEDA]))),
+    
+    "Custo Estoque",
+        IFERROR(
+         IF(Budget[MOEDA] = "BRL", 1, CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER(Budget[Data]) && Moeda[Moeda] = EARLIER(Budget[MOEDA]))) *
+             (Budget[BUDGET_COMPRAS_PREÇO] * Budget[BUDGET_CHEGADA_QUANT]) * (1 + LOOKUPVALUE(Fatores[Fator Custo], Fatores[Grupos.Genericos], Budget[Grupo])), 0),
+    
+    "Valor Desembaraço",
+        (CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER(Budget[Data]) && Moeda[Moeda] = EARLIER(Budget[MOEDA])) *
+            ( Budget[BUDGET_COMPRAS_PREÇO]) * Budget[BUDGET_CHEGADA_QUANT]) * LOOKUPVALUE(Fatores[Fator Desembaraço], Fatores[Grupos.Genericos], Budget[Grupo]),
+    
+    "Fator Custo",LOOKUPVALUE(Fatores[Fator Custo], Fatores[Grupos.Genericos], Budget[Grupo]),
+    "Fator Desembaraço",LOOKUPVALUE(Fatores[Fator Desembaraço], Fatores[Grupos.Genericos], Budget[Grupo]),
+    "valor entrada",
+    DIVIDE(
+        IFERROR(
+         IF(Budget[MOEDA] = "BRL", 1, CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER(Budget[Data]) && Moeda[Moeda] = EARLIER(Budget[MOEDA]))) *
+             (Budget[BUDGET_COMPRAS_PREÇO] * Budget[BUDGET_CHEGADA_QUANT]) * (1 + LOOKUPVALUE(Fatores[Fator Custo], Fatores[Grupos.Genericos], Budget[Grupo])), 0)
+        , Budget[BUDGET_CHEGADA_QUANT])
+    
+    )
+#Calculated Columns:
+
+#2nd: calculate alpha and (alpha -1)
+
+alpha = DIVIDE(
+     'Budget CMV'[BUDGET_CHEGADA_QUANT], 'Budget CMV'[BUDGET_CHEGADA_QUANT] +
+      IF(ISBLANK(
+          CALCULATE(
+          SUM('Budget CMV'[ESTOQUE FINAL]),
+          FILTER('Budget CMV', DATEADD('Budget CMV'[Data], 1, MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] = EARLIER('Budget CMV'[Grupo]),
+          YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data]))
+      )),
+      'Budget CMV'[ESTOQUE INICIAL]
+      ,
+                CALCULATE(
+          SUM('Budget CMV'[ESTOQUE FINAL]),
+          FILTER('Budget CMV', DATEADD('Budget CMV'[Data], 1, MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] = EARLIER('Budget CMV'[Grupo]),
+          YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data]))
+          ))
+)
+
+alpha_1 = 1 - 'Budget CMV'[alpha]
+
+#3rd: inventory cost calculation
+
+cmv unit = 
+VAR cmv_inicial = DIVIDE(
+        CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Valor],1),
+        FILTER(ALL('Estoque Inicial'),YEAR('Estoque Inicial'[Data]) = YEAR(EARLIER('Budget CMV'[Data])) && 'Estoque Inicial'[Grupo] = EARLIER('Budget CMV'[Grupo]))),
+        
+        CALCULATE(FIRSTNONBLANK('Estoque Inicial'[Estoque],1),
+        FILTER(ALL('Estoque Inicial'),YEAR('Estoque Inicial'[Data]) = YEAR(EARLIER('Budget CMV'[Data])) && 'Estoque Inicial'[Grupo] = EARLIER('Budget CMV'[Grupo]))))
+
+VAR alpha_p1 = 
+CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],1,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p2 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],2,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))     
+VAR alpha_p3 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],3,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p4 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],4,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p5 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],5,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p6 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],6,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p7 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],7,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p8 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],8,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p9 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],9,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p10 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],10,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p11 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],11,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_p12 = CALCULATE(SUM('Budget CMV'[alpha]),FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],12,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]),YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+
+
+VAR alpha_1_p1 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],1,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p2 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],2,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p3 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],3,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p4 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],4,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p5 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],5,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p6 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],6,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p7 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],7,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p8 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],8,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p9 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],9,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p10 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],10,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p11 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],11,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+VAR alpha_1_p12 = CALCULATE(SUM('Budget CMV'[alpha_1]), FILTER('Budget CMV',
+     DATEADD('Budget CMV'[Data],12,MONTH) = EARLIER('Budget CMV'[Data])),'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]), YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data])))
+
+VAR val_ent_p1 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],1,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p2 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],2,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p3 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],3,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p4 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],4,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p5 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],5,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p6 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],6,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p7 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],7,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p8 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],8,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p9 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],9,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p10 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],10,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p11 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],11,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+VAR val_ent_p12 = CALCULATE(SUM('Budget CMV'[valor entrada]), FILTER('Budget CMV', DATEADD('Budget CMV'[Data],12,MONTH) = EARLIER('Budget CMV'[Data])), 'Budget CMV'[Grupo] =EARLIER('Budget CMV'[Grupo]))
+
+
+RETURN
+
+'Budget CMV'[alpha] * 'Budget CMV'[valor entrada] + 'Budget CMV'[alpha_1] *
+    IF(ISBLANK(alpha_p1), cmv_inicial, alpha_p1 * val_ent_p1 + alpha_1_p1 *
+        if(ISBLANK(alpha_p2), cmv_inicial, alpha_p2 * val_ent_p2 + alpha_1_p2 *
+            IF(ISBLANK(alpha_p3), cmv_inicial, alpha_p3 * val_ent_p3 + alpha_1_p3 *
+                IF(ISBLANK(alpha_p4), cmv_inicial, alpha_p4 * val_ent_p4 + alpha_1_p4 * 
+                    IF(ISBLANK(alpha_p5), cmv_inicial, alpha_p5 * val_ent_p5 + alpha_1_p5 * 
+                        IF(ISBLANK(alpha_p6), cmv_inicial, alpha_p6 * val_ent_p6 + alpha_1_p6 * 
+                            IF(ISBLANK(alpha_p7), cmv_inicial, alpha_p7 * val_ent_p7 + alpha_1_p7 * 
+                                IF(ISBLANK(alpha_p8), cmv_inicial, alpha_p8 * val_ent_p8 + alpha_1_p8 * 
+                                    IF(ISBLANK(alpha_p9), cmv_inicial, alpha_p9 * val_ent_p9 + alpha_1_p9 * 
+                                        IF(ISBLANK(alpha_p10), cmv_inicial, alpha_p10 * val_ent_p10 + alpha_1_p10 * 
+                                            IF(ISBLANK(alpha_p11), cmv_inicial, alpha_p11 * val_ent_p11 + alpha_1_p11 * 
+                                                IF(ISBLANK(alpha_p12), cmv_inicial, alpha_p12 * val_ent_p12 + alpha_1_p12 * 
+            cmv_inicial) )))))))))))
+
+#4th: Inventory with new cost
+ESTOQUE FINAL VALOR COM CMV = 
+CALCULATE(
+    SUM('Budget CMV'[ESTOQUE INICIAL VALOR]) + 
+        SUM('Budget CMV'[Custo Estoque])
+            - SUM('Budget CMV'[CMV_VENDA]),
+    FILTER('Budget CMV', 'Budget CMV'[Data] <=EARLIER('Budget CMV'[Data])),
+    'Budget CMV'[Grupo] = EARLIER('Budget CMV'[Grupo]),
+    YEAR('Budget CMV'[Data]) = YEAR(EARLIER('Budget CMV'[Data]))
+)
+
+#5th: COGS
+CMV_VENDA = 
+    IF(ISBLANK('Budget CMV'[cmv unit]),
+     IF('Budget CMV'[MOEDA] = "BRL", 1, 
+     CALCULATE(FIRSTNONBLANK(Moeda[Taxa],1),  Moeda[Data] = EARLIER('Budget CMV'[Data]) && Moeda[Moeda] = EARLIER('Budget CMV'[MOEDA]))) *
+             'Budget CMV'[BUDGET_COMPRAS_PREÇO] * (1 + LOOKUPVALUE(Fatores[Fator Desembaraço], Fatores[Grupos.Genericos], 'Budget CMV'[Grupo]))
+    * 'Budget CMV'[BUDGET_QUANT]
+    ,'Budget CMV'[cmv unit] * 'Budget CMV'[BUDGET_QUANT])
+   
