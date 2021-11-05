@@ -1,5 +1,7 @@
 # Table with cumulative percentage in days considering due date
 
+# [TEMPO] in SQL = CASE WHEN E1_BAIXA <> '' THEN DATEDIFF(DAY, E1_EMISSAO, E1_BAIXA) ELSE '' END TEMPO
+
 TEMPO_PRAZO = 
 VAR _TOTAL = SUM( CAR[VALOR])
 
