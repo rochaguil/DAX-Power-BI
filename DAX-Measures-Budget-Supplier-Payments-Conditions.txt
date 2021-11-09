@@ -7,3 +7,9 @@ Tabela =
     'xl Previsão Compras'),
         'xl Prazo Forn'[Fornecedor] = 'xl Previsão Compras'[Linha]
 )
+
+# Add column to multiply the condition (in %) with value
+Valor Parc = [Valor] * Tabela[Parcela]
+
+# Add column to add in months considering the month of purchase
+Data Pag = DATEADD(Tabela[Data], Tabela[Prazo], MONTH)
