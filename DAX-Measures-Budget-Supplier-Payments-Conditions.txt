@@ -1,0 +1,9 @@
+# Crossjoin between supplier conditions and purchase plan with Filter to match the supplier name between both
+
+Tabela = 
+    FILTER(
+     CROSSJOIN(
+    'xl Prazo Forn', 
+    'xl Previsão Compras'),
+        'xl Prazo Forn'[Fornecedor] = 'xl Previsão Compras'[Linha]
+)
