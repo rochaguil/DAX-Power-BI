@@ -1,0 +1,12 @@
+EM ABERTO = 
+VAR forn = SWITCH(
+                (SELECTEDVALUE(produtos[LINHA])),
+                 "LINHA1", "NOME1",
+                "LINHA2", "NOME2",
+                "LINHA3", "NOME3",
+                "LINHA4", "NOME4",
+                 SELECTEDVALUE(produtos[LINHA]))
+
+RETURN
+ calculate(sum('pedidos em aberto'[QUANT]),
+                CONTAINSSTRING('pedidos em aberto'[LINHA], forn))
