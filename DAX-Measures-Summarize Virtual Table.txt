@@ -1,0 +1,12 @@
+Nr. Cust. Total = COUNTROWS(
+        SUMMARIZE(
+        FILTER(
+            ADDCOLUMNS(
+            CROSSJOIN(SELECTCOLUMNS(SA1010,"CUSTKEY",[custkey]),
+            SELECTCOLUMNS(FILTER(SB1010, 
+                AND(RELATED(CTT010[CTT_DESC01]) <> "NOME1", RELATED(CTT010[CTT_DESC01]) <> "NOME2")),
+                "PROD",[B1_COD])),
+                "TOTAL", SUMX(RELATEDTABLE('Table1'), [CUSTO]) - SUMX(relatedtable(Table2),[Últ. Custo]  * [Saldo])
+        ), [TOTAL] > 0 )
+    ,[CUSTKEY]))
+   
