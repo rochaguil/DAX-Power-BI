@@ -1,0 +1,11 @@
+sply = 
+//move the date to the previous year with EDATE (it has to use a calendar table to expand each month until the last day)
+//keep the maximum date with SPLY context (otherwise it will read the last day of the month)
+var _end = CALCULATE(EDATE(MAX('calendar'[Date]),-12), SAMEPERIODLASTYEAR(Sheet1[Release Date]))
+
+//calculate the first date for the month and year row context
+var _start = EDATE(min('calendar'[Date]),-12)
+
+return
+//filter the dates directly in  CALCULATE formula
+CALCULATE([budget], 'calendar'[Date]>= _start && 'calendar'[Date] <= _end)
