@@ -1,3 +1,16 @@
+/*
+Context
+  We are comparing each year with its previous year.
+Problem
+  The current year is not finished yet and the last year amount must consider the same
+period (same quantity of months)
+  When a calendar table is used, the last day of the current year's month will be the 
+last of the month and not the last date in the table
+Solution
+  Use EDATE and the calendar table to move the date 1 year before and use the dates in the
+fact table as parameter to the SAMEPERIODLASTYEAR context
+*/
+
 sply = 
 //move the date to the previous year with EDATE (it has to use a calendar table to expand each month until the last day)
 //keep the maximum date with SPLY context (otherwise it will read the last day of the month)
