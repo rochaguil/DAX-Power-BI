@@ -7,18 +7,21 @@ period (same quantity of months)
   When a calendar table is used, the last day of the current year's month will be the 
 last of the month and not the last date in the table
 Solution
-  Use EDATE and the calendar table to move the date 1 year before and use the dates in the
-fact table as parameter to the SAMEPERIODLASTYEAR context
+  1- Move the last date to the previous year using EDATE
+  2- Use CALCULATE with two filter contexts:
+    a) SAMEPERIODLASTYEAR and 
+    b) filter only what is before the last date (1)
+Obs
+  1- The CALCULATE formula already excludes any filter context.
+  2- SAMEPERIODLASTYEAR alone would consider the whole month
 */
 
 sply = 
-//move the date to the previous year with EDATE (it has to use a calendar table to expand each month until the last day)
-//keep the maximum date with SPLY context (otherwise it will read the last day of the month)
-var _end = CALCULATE(EDATE(MAX('calendar'[Date]),-12), SAMEPERIODLASTYEAR(Sheet1[Release Date]))
-
-//calculate the first date for the month and year row context
-var _start = EDATE(min('calendar'[Date]),-12)
+//move the last date to the previous year with EDATE
+var _last_dt = EDATE(MAXX(ALL('calendar'), [Date]) ,-12)
 
 return
-//filter the dates directly in  CALCULATE formula
-CALCULATE([budget], 'calendar'[Date]>= _start && 'calendar'[Date] <= _end)
+//use two filters: SAMEPERIODLASTYEAR and previous to the last date
+CALCULATE([budget],
+    SAMEPERIODLASTYEAR('calendar'[Date]),
+    'calendar'[Date] <= _last_dt)
